@@ -1,7 +1,7 @@
 /* ========= 設定（部署前請修改） ========= */
 const CONFIG = {
-  LIFF_ID: 'https://developers.line.biz/console/channel/2011084676/liff/2011084676-wog0MoCX',
-  API_URL: 'https://script.google.com/macros/s/AKfycbwrCtCJtuoilN3DghNHVrvJz-ax4ehlsJQ1Xu0RyAdCFArhMB2BzpTHgkRFn1vey7RS/exec',
+  LIFF_ID: 'YOUR_LIFF_ID',
+  API_URL: 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec',
 };
 
 const SLOTS = [
@@ -19,6 +19,7 @@ const S = { data: null, offset: 0, adminMode: false };
 /* ========= 工具 ========= */
 function toast(msg) {
   const t = $('#toast');
+  if (!t) return alert(msg); // 容錯機制
   t.textContent = msg;
   t.classList.add('on');
   clearTimeout(toast.id);
@@ -28,9 +29,16 @@ function toast(msg) {
 function ask(title, body, okText = '確定') {
   return new Promise((resolve) => {
     const d = $('#dlgConfirm');
-    $('#cfTitle').textContent = title;
-    $('#cfBody').textContent = body;
-    $('#cfOk').textContent = okText;
+    if (!d) return resolve(confirm(`${title}\n\n${body}`)); // 原生視窗備援
+    
+    const titleEl = $('#cfTitle');
+    const bodyEl = $('#cfBody');
+    const okBtn = $('#cfOk');
+    
+    if (titleEl) titleEl.textContent = title;
+    if (bodyEl) bodyEl.textContent = body;
+    if (okBtn) okBtn.textContent = okText;
+
     d.returnValue = '';
     d.onclose = () => resolve(d.returnValue === 'ok');
     d.showModal();
@@ -38,12 +46,22 @@ function ask(title, body, okText = '確定') {
 }
 
 const now = () => Date.now() + S.offset;
+
 // 星期 day(1-5) 第 slot 節開始的時間（台北時區）
 function slotStart(day, slot) {
-  return new Date(`${S.data.weekStart}T${SLOTS[slot][0]}:00+08:00`).getTime() + (day - 1) * 864e5;
+  if (!S.data?.weekStart) return Date.now();
+  // 使用正則拆解時間，確保極端瀏覽器環境下時間解析不會失效 (NaN)
+  const [h, m] = SLOTS[slot][0].split(':').map(Number);
+  const start = new Date(`${S.data.weekStart}T00:00:00+08:00`);
+  start.setDate(start.getDate() + (day - 1));
+  start.setHours(h, m, 0, 0);
+  return start.getTime();
 }
+
 function dayLabel(day) {
-  const d = new Date(new Date(`${S.data.weekStart}T00:00:00+08:00`).getTime() + (day - 1) * 864e5);
+  if (!S.data?.weekStart) return '';
+  const d = new Date(`${S.data.weekStart}T00:00:00+08:00`);
+  d.setDate(d.getDate() + (day - 1));
   return d.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' });
 }
 
@@ -54,7 +72,7 @@ async function callApi(action, payload = {}) {
   if (action === 'init') {
     const u = new URL(CONFIG.API_URL);
     u.searchParams.set('action', 'init');
-    u.searchParams.set('idToken', idToken);
+    u.searchParams.set('idToken', idToken || '');
     res = await fetch(u);
   } else {
     // text/plain 可避免 CORS preflight（GAS 不支援 OPTIONS）
@@ -72,13 +90,17 @@ async function act(action, payload) {
   try {
     const r = await callApi(action, payload);
     if (!r.ok) {
-      if (r.code === 'AUTH') { liff.logout(); liff.login(); return false; }
+      if (r.code === 'AUTH') { 
+        liff.logout(); 
+        liff.login(); 
+        return false; 
+      }
       toast(r.error || '操作失敗');
       if (action !== 'init') load(); // 同步最新狀態
       return false;
     }
     S.data = r.data;
-    S.offset = r.data.now - Date.now();
+    S.offset = (r.data.now || Date.now()) - Date.now();
     render();
     return true;
   } catch (e) {
@@ -92,34 +114,54 @@ const load = () => act('init');
 /* ========= 渲染 ========= */
 function render() {
   const D = S.data;
-  $('#who').textContent = D.registered ? D.user.name : '尚未註冊';
-  $('#adminBtn').hidden = !D.isAdmin;
-  $('#adminBar').hidden = !S.adminMode;
+  if (!D) return;
+
+  const whoEl = $('#who');
+  const adminBtn = $('#adminBtn');
+  const adminBar = $('#adminBar');
+  
+  if (whoEl) whoEl.textContent = D.registered ? (D.user?.name || '已註冊社員') : '尚未註冊';
+  if (adminBtn) adminBtn.hidden = !D.isAdmin;
+  if (adminBar) adminBar.hidden = !S.adminMode;
 
   // 跑馬燈
   const mq = $('#mq');
-  mq.hidden = !D.announcements.length;
-  if (D.announcements.length) {
-    const text = D.announcements.map((a) => a.text).join('　　●　　');
-    $('#mqText').textContent = text;
-    $('#mqText').style.setProperty('--dur', Math.max(15, text.length * 0.35) + 's');
+  const mqText = $('#mqText');
+  if (mq && mqText) {
+    const anns = D.announcements || [];
+    mq.hidden = !anns.length;
+    if (anns.length) {
+      const text = anns.map((a) => a.text).join('  ●  ');
+      mqText.textContent = text;
+      mqText.style.setProperty('--dur', Math.max(15, text.length * 0.35) + 's');
+    }
   }
 
   // 密碼（僅已註冊社員）
-  $('#pw').hidden = !D.registered;
-  if (D.registered) $('#pwVal').textContent = D.password || '（未設定）';
+  const pwEl = $('#pw');
+  const pwValEl = $('#pwVal');
+  if (pwEl) pwEl.hidden = !D.registered;
+  if (pwValEl && D.registered) pwValEl.textContent = D.password || '（未設定）';
 
   // 課表
-  const mine = D.bookings.filter((b) => b.mine).length;
-  $('#weekLabel').textContent = `本週 ${dayLabel(1)} 至 ${dayLabel(5)}`;
-  $('#quota').textContent = `已預約 ${mine} / ${D.limit}`;
+  const bookings = D.bookings || [];
+  const fixed = D.fixed || [];
+  const mineCount = bookings.filter((b) => b.mine).length;
+
+  const weekLabel = $('#weekLabel');
+  const quota = $('#quota');
+  if (weekLabel) weekLabel.textContent = `本週 ${dayLabel(1)} 至 ${dayLabel(5)}`;
+  if (quota) quota.textContent = `已預約 ${mineCount} / ${D.limit || 3}`;
 
   const map = {};
-  D.fixed.forEach((f) => (map[`${f.day}-${f.slot}`] = { type: 'fixed', label: f.label }));
-  D.bookings.forEach((b) => (map[`${b.day}-${b.slot}`] = { type: b.mine ? 'mine' : 'booked', label: b.name }));
+  fixed.forEach((f) => (map[`${f.day}-${f.slot}`] = { type: 'fixed', label: f.label }));
+  bookings.forEach((b) => (map[`${b.day}-${b.slot}`] = { type: b.mine ? 'mine' : 'booked', label: b.name }));
 
   const g = $('#grid');
+  if (!g) return;
   g.replaceChildren();
+
+  // 課表 Header
   const head = g.createTHead().insertRow();
   head.appendChild(document.createElement('th'));
   DAYS.forEach((n, i) => {
@@ -131,6 +173,7 @@ function render() {
     head.appendChild(th);
   });
 
+  // 課表 Body
   const body = g.createTBody();
   SLOTS.forEach(([a, b], slot) => {
     const tr = body.insertRow();
@@ -164,11 +207,16 @@ async function onCell(day, slot, cell, past) {
 
   if (S.adminMode) {
     if (cell && cell.type === 'fixed') {
-      if (await ask('取消固定時段', `${when}「${cell.label}」要恢復為可預約嗎？`)) act('admin_setFixed', { day, slot, clear: true });
+      if (await ask('取消固定時段', `${when}「${cell.label}」要恢復為可預約嗎？`)) {
+        act('admin_setFixed', { day, slot, clear: true });
+      }
     } else {
-      const label = $('#fixedLabel').value.trim() || '樂器班';
-      const warn = cell ? `（目前已有 ${cell.label} 的預約，將被取消）` : '';
-      if (await ask('設為固定時段', `${when} 設為「${label}」${warn}`)) act('admin_setFixed', { day, slot, label });
+      const fixedLabelInput = $('#fixedLabel');
+      const label = fixedLabelInput ? (fixedLabelInput.value.trim() || '樂器班') : '樂器班';
+      const warn = cell ? `\n（注意：目前已有 ${cell.label} 的預約，將被覆蓋取消）` : '';
+      if (await ask('設為固定時段', `${when} 設為「${label}」${warn}`)) {
+        act('admin_setFixed', { day, slot, label });
+      }
     }
     return;
   }
@@ -185,8 +233,8 @@ async function onCell(day, slot, cell, past) {
     return;
   }
 
-  const mine = D.bookings.filter((b) => b.mine).length;
-  if (mine >= D.limit) return toast(`每週最多預約 ${D.limit} 個時段`);
+  const mineCount = D.bookings.filter((b) => b.mine).length;
+  if (mineCount >= D.limit) return toast(`每週最多預約 ${D.limit} 個時段`);
   if (await ask('預約時段', `確定預約 ${when} 嗎？`, '預約')) {
     if (await act('book', { day, slot })) toast('預約成功');
   }
@@ -195,31 +243,64 @@ async function onCell(day, slot, cell, past) {
 /* ========= 註冊 ========= */
 function openRegister() {
   const d = $('#dlgReg');
-  if (!d.open) d.showModal();
+  if (d && !d.open) d.showModal();
 }
-$('#dlgReg').addEventListener('cancel', (e) => e.preventDefault()); // 不可用 Esc 關閉
-$('#regForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const btn = $('#regOk');
-  btn.disabled = true;
-  const ok = await act('register', { name: $('#regName').value.trim(), studentId: $('#regSid').value.trim() });
-  btn.disabled = false;
-  if (ok) { $('#dlgReg').close(); toast('註冊成功'); }
-});
+
+const dlgReg = $('#dlgReg');
+if (dlgReg) {
+  dlgReg.addEventListener('cancel', (e) => e.preventDefault()); // 不可用 Esc 關閉
+}
+
+const regForm = $('#regForm');
+if (regForm) {
+  regForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('#regOk');
+    const nameInput = $('#regName');
+    const sidInput = $('#regSid');
+
+    if (!nameInput?.value.trim() || !sidInput?.value.trim()) {
+      return toast('請填寫完整資訊');
+    }
+
+    if (btn) btn.disabled = true;
+    const ok = await act('register', { 
+      name: nameInput.value.trim(), 
+      studentId: sidInput.value.trim() 
+    });
+    if (btn) btn.disabled = false;
+
+    if (ok) { 
+      $('#dlgReg')?.close(); 
+      toast('註冊成功'); 
+    }
+  });
+}
 
 /* ========= 密碼顯示 ========= */
-$('#pwBtn').onclick = () => {
-  const el = $('#pwVal');
-  const hidden = el.classList.toggle('hide');
-  $('#pwBtn').textContent = hidden ? '顯示' : '隱藏';
-};
+const pwBtn = $('#pwBtn');
+if (pwBtn) {
+  pwBtn.onclick = () => {
+    const el = $('#pwVal');
+    if (!el) return;
+    const hidden = el.classList.toggle('hide');
+    pwBtn.textContent = hidden ? '顯示' : '隱藏';
+  };
+}
 
 /* ========= 管理後台 ========= */
 function renderAnn() {
   const box = $('#annList');
+  if (!box) return;
   box.replaceChildren();
-  if (!S.data.announcements.length) box.textContent = '目前沒有公告';
-  S.data.announcements.forEach((a) => {
+  
+  const anns = S.data?.announcements || [];
+  if (!anns.length) {
+    box.textContent = '目前沒有公告';
+    return;
+  }
+  
+  anns.forEach((a) => {
     const row = document.createElement('div');
     row.className = 'ann';
     const t = document.createElement('span');
@@ -228,44 +309,78 @@ function renderAnn() {
     del.type = 'button';
     del.textContent = '刪除';
     del.onclick = async () => {
-      if (await ask('刪除公告', a.text, '刪除')) { await act('admin_deleteAnnouncement', { id: a.id }); openAdmin(); }
+      if (await ask('刪除公告', a.text, '刪除')) { 
+        await act('admin_deleteAnnouncement', { id: a.id }); 
+        renderAnn(); 
+      }
     };
     row.append(t, del);
     box.appendChild(row);
   });
 }
+
 function openAdmin() {
   renderAnn();
-  $('#newPw').value = '';
-  if (!$('#dlgAdmin').open) $('#dlgAdmin').showModal();
+  const newPw = $('#newPw');
+  if (newPw) newPw.value = '';
+  const dlgAdmin = $('#dlgAdmin');
+  if (dlgAdmin && !dlgAdmin.open) dlgAdmin.showModal();
 }
-$('#adminBtn').onclick = openAdmin;
-$('#adminClose').onclick = () => $('#dlgAdmin').close();
-$('#fixedMode').onclick = () => { S.adminMode = true; $('#dlgAdmin').close(); render(); };
-$('#adminDone').onclick = () => { S.adminMode = false; render(); };
-$('#annAdd').onclick = async () => {
-  const text = $('#annText').value.trim();
+
+$('#adminBtn')?.addEventListener('click', openAdmin);
+$('#adminClose')?.addEventListener('click', () => $('#dlgAdmin')?.close());
+$('#fixedMode')?.addEventListener('click', () => { 
+  S.adminMode = true; 
+  $('#dlgAdmin')?.close(); 
+  render(); 
+});
+$('#adminDone')?.addEventListener('click', () => { 
+  S.adminMode = false; 
+  render(); 
+});
+
+$('#annAdd')?.addEventListener('click', async () => {
+  const input = $('#annText');
+  const text = input?.value.trim();
   if (!text) return toast('請輸入公告內容');
-  if (await act('admin_addAnnouncement', { text })) { $('#annText').value = ''; renderAnn(); }
-};
-$('#pwSave').onclick = async () => {
-  const password = $('#newPw').value.trim();
+  if (await act('admin_addAnnouncement', { text })) { 
+    if (input) input.value = ''; 
+    renderAnn(); 
+  }
+});
+
+$('#pwSave')?.addEventListener('click', async () => {
+  const input = $('#newPw');
+  const password = input?.value.trim();
   if (!password) return toast('請輸入新密碼');
-  if (await act('admin_setPassword', { password })) { $('#newPw').value = ''; toast('社辦密碼已更新'); }
-};
+  if (await act('admin_setPassword', { password })) { 
+    if (input) input.value = ''; 
+    toast('社辦密碼已更新'); 
+  }
+});
 
 /* ========= 啟動 ========= */
 (async function boot() {
   try {
     await liff.init({ liffId: CONFIG.LIFF_ID });
-    if (!liff.isLoggedIn()) { liff.login(); return; }
-    await load();
-    if (S.data && !S.data.registered) openRegister();
-    setInterval(() => S.data && render(), 60000); // 每分鐘更新「已過期」狀態
+    if (!liff.isLoggedIn()) { 
+      liff.login(); 
+      return; 
+    }
+    
+    const ok = await load();
+    if (ok && S.data && !S.data.registered) {
+      openRegister();
+    }
+    
+    // 每分鐘重新計算並更新「已過期」顯示狀態
+    setInterval(() => S.data && render(), 60000);
   } catch (e) {
-    console.error(e);
-    $('#loading').textContent = '載入失敗，請重新開啟頁面';
+    console.error('LIFF 初始化失敗:', e);
+    const loading = $('#loading');
+    if (loading) loading.textContent = '載入失敗，請重新開啟頁面';
     return;
   }
-  $('#loading').remove();
+  
+  $('#loading')?.remove();
 })();
