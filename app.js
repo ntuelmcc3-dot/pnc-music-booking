@@ -1,0 +1,271 @@
+/* ========= 設定（部署前請修改） ========= */
+const CONFIG = {
+  LIFF_ID: 'YOUR_LIFF_ID',
+  API_URL: 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec',
+};
+
+const SLOTS = [
+  ['08:00', '09:00'], ['09:00', '10:00'], ['10:00', '11:00'], ['11:00', '12:00'],
+  ['12:00', '13:30'], // 午休
+  ['13:30', '14:30'], ['14:30', '15:30'], ['15:30', '16:30'], ['16:30', '17:30'],
+  ['18:00', '19:00'], ['19:00', '20:00'], ['20:00', '21:00'], ['21:00', '22:00'],
+];
+const LUNCH_INDEX = 4;
+const DAYS = ['一', '二', '三', '四', '五'];
+
+const $ = (s) => document.querySelector(s);
+const S = { data: null, offset: 0, adminMode: false };
+
+/* ========= 工具 ========= */
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toast.id);
+  toast.id = setTimeout(() => t.classList.remove('on'), 2400);
+}
+
+function ask(title, body, okText = '確定') {
+  return new Promise((resolve) => {
+    const d = $('#dlgConfirm');
+    $('#cfTitle').textContent = title;
+    $('#cfBody').textContent = body;
+    $('#cfOk').textContent = okText;
+    d.returnValue = '';
+    d.onclose = () => resolve(d.returnValue === 'ok');
+    d.showModal();
+  });
+}
+
+const now = () => Date.now() + S.offset;
+// 星期 day(1-5) 第 slot 節開始的時間（台北時區）
+function slotStart(day, slot) {
+  return new Date(`${S.data.weekStart}T${SLOTS[slot][0]}:00+08:00`).getTime() + (day - 1) * 864e5;
+}
+function dayLabel(day) {
+  const d = new Date(new Date(`${S.data.weekStart}T00:00:00+08:00`).getTime() + (day - 1) * 864e5);
+  return d.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' });
+}
+
+/* ========= API ========= */
+async function callApi(action, payload = {}) {
+  const idToken = liff.getIDToken();
+  let res;
+  if (action === 'init') {
+    const u = new URL(CONFIG.API_URL);
+    u.searchParams.set('action', 'init');
+    u.searchParams.set('idToken', idToken);
+    res = await fetch(u);
+  } else {
+    // text/plain 可避免 CORS preflight（GAS 不支援 OPTIONS）
+    res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, idToken, ...payload }),
+    });
+  }
+  return res.json();
+}
+
+// 執行並更新畫面；成功回傳 true
+async function act(action, payload) {
+  try {
+    const r = await callApi(action, payload);
+    if (!r.ok) {
+      if (r.code === 'AUTH') { liff.logout(); liff.login(); return false; }
+      toast(r.error || '操作失敗');
+      if (action !== 'init') load(); // 同步最新狀態
+      return false;
+    }
+    S.data = r.data;
+    S.offset = r.data.now - Date.now();
+    render();
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast('網路異常，請稍後再試');
+    return false;
+  }
+}
+const load = () => act('init');
+
+/* ========= 渲染 ========= */
+function render() {
+  const D = S.data;
+  $('#who').textContent = D.registered ? D.user.name : '尚未註冊';
+  $('#adminBtn').hidden = !D.isAdmin;
+  $('#adminBar').hidden = !S.adminMode;
+
+  // 跑馬燈
+  const mq = $('#mq');
+  mq.hidden = !D.announcements.length;
+  if (D.announcements.length) {
+    const text = D.announcements.map((a) => a.text).join('　　●　　');
+    $('#mqText').textContent = text;
+    $('#mqText').style.setProperty('--dur', Math.max(15, text.length * 0.35) + 's');
+  }
+
+  // 密碼（僅已註冊社員）
+  $('#pw').hidden = !D.registered;
+  if (D.registered) $('#pwVal').textContent = D.password || '（未設定）';
+
+  // 課表
+  const mine = D.bookings.filter((b) => b.mine).length;
+  $('#weekLabel').textContent = `本週 ${dayLabel(1)} 至 ${dayLabel(5)}`;
+  $('#quota').textContent = `已預約 ${mine} / ${D.limit}`;
+
+  const map = {};
+  D.fixed.forEach((f) => (map[`${f.day}-${f.slot}`] = { type: 'fixed', label: f.label }));
+  D.bookings.forEach((b) => (map[`${b.day}-${b.slot}`] = { type: b.mine ? 'mine' : 'booked', label: b.name }));
+
+  const g = $('#grid');
+  g.replaceChildren();
+  const head = g.createTHead().insertRow();
+  head.appendChild(document.createElement('th'));
+  DAYS.forEach((n, i) => {
+    const th = document.createElement('th');
+    th.append(`週${n}`);
+    const s = document.createElement('small');
+    s.textContent = dayLabel(i + 1);
+    th.appendChild(s);
+    head.appendChild(th);
+  });
+
+  const body = g.createTBody();
+  SLOTS.forEach(([a, b], slot) => {
+    const tr = body.insertRow();
+    if (slot === LUNCH_INDEX) tr.className = 'lunch';
+    const th = document.createElement('th');
+    th.scope = 'row';
+    th.append(a);
+    const sm = document.createElement('small');
+    sm.textContent = slot === LUNCH_INDEX ? `${b} 午休` : b;
+    th.appendChild(sm);
+    tr.appendChild(th);
+
+    for (let day = 1; day <= 5; day++) {
+      const cell = map[`${day}-${slot}`];
+      const past = slotStart(day, slot) <= now();
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = (cell ? cell.type : 'free') + (past ? ' past' : '');
+      if (cell) btn.textContent = cell.label;
+      btn.setAttribute('aria-label', `週${DAYS[day - 1]} ${a}-${b} ${cell ? cell.label : '可預約'}${past ? ' 已過期' : ''}`);
+      btn.onclick = () => onCell(day, slot, cell, past);
+      tr.insertCell().appendChild(btn);
+    }
+  });
+}
+
+/* ========= 點擊格子 ========= */
+async function onCell(day, slot, cell, past) {
+  const D = S.data;
+  const when = `週${DAYS[day - 1]} ${SLOTS[slot][0]}–${SLOTS[slot][1]}`;
+
+  if (S.adminMode) {
+    if (cell && cell.type === 'fixed') {
+      if (await ask('取消固定時段', `${when}「${cell.label}」要恢復為可預約嗎？`)) act('admin_setFixed', { day, slot, clear: true });
+    } else {
+      const label = $('#fixedLabel').value.trim() || '樂器班';
+      const warn = cell ? `（目前已有 ${cell.label} 的預約，將被取消）` : '';
+      if (await ask('設為固定時段', `${when} 設為「${label}」${warn}`)) act('admin_setFixed', { day, slot, label });
+    }
+    return;
+  }
+
+  if (!D.registered) return openRegister();
+  if (past) return toast('這個時段已過期');
+  if (cell && cell.type === 'fixed') return toast(`固定時段：${cell.label}`);
+  if (cell && cell.type === 'booked') return toast(`已被 ${cell.label} 預約`);
+
+  if (cell && cell.type === 'mine') {
+    if (await ask('取消預約', `確定取消 ${when} 的預約嗎？`, '取消預約')) {
+      if (await act('cancel', { day, slot })) toast('已取消預約');
+    }
+    return;
+  }
+
+  const mine = D.bookings.filter((b) => b.mine).length;
+  if (mine >= D.limit) return toast(`每週最多預約 ${D.limit} 個時段`);
+  if (await ask('預約時段', `確定預約 ${when} 嗎？`, '預約')) {
+    if (await act('book', { day, slot })) toast('預約成功');
+  }
+}
+
+/* ========= 註冊 ========= */
+function openRegister() {
+  const d = $('#dlgReg');
+  if (!d.open) d.showModal();
+}
+$('#dlgReg').addEventListener('cancel', (e) => e.preventDefault()); // 不可用 Esc 關閉
+$('#regForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('#regOk');
+  btn.disabled = true;
+  const ok = await act('register', { name: $('#regName').value.trim(), studentId: $('#regSid').value.trim() });
+  btn.disabled = false;
+  if (ok) { $('#dlgReg').close(); toast('註冊成功'); }
+});
+
+/* ========= 密碼顯示 ========= */
+$('#pwBtn').onclick = () => {
+  const el = $('#pwVal');
+  const hidden = el.classList.toggle('hide');
+  $('#pwBtn').textContent = hidden ? '顯示' : '隱藏';
+};
+
+/* ========= 管理後台 ========= */
+function renderAnn() {
+  const box = $('#annList');
+  box.replaceChildren();
+  if (!S.data.announcements.length) box.textContent = '目前沒有公告';
+  S.data.announcements.forEach((a) => {
+    const row = document.createElement('div');
+    row.className = 'ann';
+    const t = document.createElement('span');
+    t.textContent = a.text;
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '刪除';
+    del.onclick = async () => {
+      if (await ask('刪除公告', a.text, '刪除')) { await act('admin_deleteAnnouncement', { id: a.id }); openAdmin(); }
+    };
+    row.append(t, del);
+    box.appendChild(row);
+  });
+}
+function openAdmin() {
+  renderAnn();
+  $('#newPw').value = '';
+  if (!$('#dlgAdmin').open) $('#dlgAdmin').showModal();
+}
+$('#adminBtn').onclick = openAdmin;
+$('#adminClose').onclick = () => $('#dlgAdmin').close();
+$('#fixedMode').onclick = () => { S.adminMode = true; $('#dlgAdmin').close(); render(); };
+$('#adminDone').onclick = () => { S.adminMode = false; render(); };
+$('#annAdd').onclick = async () => {
+  const text = $('#annText').value.trim();
+  if (!text) return toast('請輸入公告內容');
+  if (await act('admin_addAnnouncement', { text })) { $('#annText').value = ''; renderAnn(); }
+};
+$('#pwSave').onclick = async () => {
+  const password = $('#newPw').value.trim();
+  if (!password) return toast('請輸入新密碼');
+  if (await act('admin_setPassword', { password })) { $('#newPw').value = ''; toast('社辦密碼已更新'); }
+};
+
+/* ========= 啟動 ========= */
+(async function boot() {
+  try {
+    await liff.init({ liffId: CONFIG.LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    await load();
+    if (S.data && !S.data.registered) openRegister();
+    setInterval(() => S.data && render(), 60000); // 每分鐘更新「已過期」狀態
+  } catch (e) {
+    console.error(e);
+    $('#loading').textContent = '載入失敗，請重新開啟頁面';
+    return;
+  }
+  $('#loading').remove();
+})();
