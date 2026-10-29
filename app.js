@@ -1,271 +1,187 @@
-/* ========= 設定（部署前請修改） ========= */
-const CONFIG = {
-  LIFF_ID: '2011084676-suwQE7jT',
-  API_URL: 'https://script.google.com/macros/s/AKfycbxB38D-Yxew6xcW1gzYTjtz00z6NT0-dowLK9Be6yn3vd84vZTSPNpjDCvxFkcWt31AFQ/exec',
-};
+// app.js
+const LIFF_ID = "2011084676-suwQE7jT"; 
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzdFBExPsp296HKlcZEK4NZ_qCIfBDbV5REPEYqMyJ4h93vZznQv-yki4XVMMo6Dj-7XQ/exec";
 
-const SLOTS = [
-  ['08:00', '09:00'], ['09:00', '10:00'], ['10:00', '11:00'], ['11:00', '12:00'],
-  ['12:00', '13:30'], // 午休
-  ['13:30', '14:30'], ['14:30', '15:30'], ['15:30', '16:30'], ['16:30', '17:30'],
-  ['18:00', '19:00'], ['19:00', '20:00'], ['20:00', '21:00'], ['21:00', '22:00'],
+const timeSlots = [
+  "08:00-09:00", "09:00-10:00", "10:00-11:00", "11:00-12:00",
+  "12:00-13:30", "13:30-14:30", "14:30-15:30", "15:30-16:30",
+  "16:30-17:30", "18:00-19:00", "19:00-20:00", "20:00-21:00", "21:00-22:00"
 ];
-const LUNCH_INDEX = 4;
-const DAYS = ['一', '二', '三', '四', '五'];
 
-const $ = (s) => document.querySelector(s);
-const S = { data: null, offset: 0, adminMode: false };
+let currentUser = null;
+let systemData = null;
 
-/* ========= 工具 ========= */
-function toast(msg) {
-  const t = $('#toast');
-  t.textContent = msg;
-  t.classList.add('on');
-  clearTimeout(toast.id);
-  toast.id = setTimeout(() => t.classList.remove('on'), 2400);
-}
-
-function ask(title, body, okText = '確定') {
-  return new Promise((resolve) => {
-    const d = $('#dlgConfirm');
-    $('#cfTitle').textContent = title;
-    $('#cfBody').textContent = body;
-    $('#cfOk').textContent = okText;
-    d.returnValue = '';
-    d.onclose = () => resolve(d.returnValue === 'ok');
-    d.showModal();
-  });
-}
-
-const now = () => Date.now() + S.offset;
-// 星期 day(1-5) 第 slot 節開始的時間（台北時區）
-function slotStart(day, slot) {
-  return new Date(`${S.data.weekStart}T${SLOTS[slot][0]}:00+08:00`).getTime() + (day - 1) * 864e5;
-}
-function dayLabel(day) {
-  const d = new Date(new Date(`${S.data.weekStart}T00:00:00+08:00`).getTime() + (day - 1) * 864e5);
-  return d.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' });
-}
-
-/* ========= API ========= */
-async function callApi(action, payload = {}) {
-  const idToken = liff.getIDToken();
-  let res;
-  if (action === 'init') {
-    const u = new URL(CONFIG.API_URL);
-    u.searchParams.set('action', 'init');
-    u.searchParams.set('idToken', idToken);
-    res = await fetch(u);
-  } else {
-    // text/plain 可避免 CORS preflight（GAS 不支援 OPTIONS）
-    res = await fetch(CONFIG.API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, idToken, ...payload }),
-    });
-  }
-  return res.json();
-}
-
-// 執行並更新畫面；成功回傳 true
-async function act(action, payload) {
+window.onload = async () => {
   try {
-    const r = await callApi(action, payload);
-    if (!r.ok) {
-      if (r.code === 'AUTH') { liff.logout(); liff.login(); return false; }
-      toast(r.error || '操作失敗');
-      if (action !== 'init') load(); // 同步最新狀態
-      return false;
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
     }
-    S.data = r.data;
-    S.offset = r.data.now - Date.now();
-    render();
-    return true;
-  } catch (e) {
-    console.error(e);
-    toast('網路異常，請稍後再試');
-    return false;
+    const profile = await liff.getProfile();
+    fetchInitData(profile.userId);
+  } catch (err) {
+    alert("LIFF 初始化失敗");
   }
-}
-const load = () => act('init');
+};
 
-/* ========= 渲染 ========= */
-function render() {
-  const D = S.data;
-  $('#who').textContent = D.registered ? D.user.name : '尚未註冊';
-  $('#adminBtn').hidden = !D.isAdmin;
-  $('#adminBar').hidden = !S.adminMode;
-
-  // 跑馬燈
-  const mq = $('#mq');
-  mq.hidden = !D.announcements.length;
-  if (D.announcements.length) {
-    const text = D.announcements.map((a) => a.text).join('　　●　　');
-    $('#mqText').textContent = text;
-    $('#mqText').style.setProperty('--dur', Math.max(15, text.length * 0.35) + 's');
-  }
-
-  // 密碼（僅已註冊社員）
-  $('#pw').hidden = !D.registered;
-  if (D.registered) $('#pwVal').textContent = D.password || '（未設定）';
-
-  // 課表
-  const mine = D.bookings.filter((b) => b.mine).length;
-  $('#weekLabel').textContent = `本週 ${dayLabel(1)} 至 ${dayLabel(5)}`;
-  $('#quota').textContent = `已預約 ${mine} / ${D.limit}`;
-
-  const map = {};
-  D.fixed.forEach((f) => (map[`${f.day}-${f.slot}`] = { type: 'fixed', label: f.label }));
-  D.bookings.forEach((b) => (map[`${b.day}-${b.slot}`] = { type: b.mine ? 'mine' : 'booked', label: b.name }));
-
-  const g = $('#grid');
-  g.replaceChildren();
-  const head = g.createTHead().insertRow();
-  head.appendChild(document.createElement('th'));
-  DAYS.forEach((n, i) => {
-    const th = document.createElement('th');
-    th.append(`週${n}`);
-    const s = document.createElement('small');
-    s.textContent = dayLabel(i + 1);
-    th.appendChild(s);
-    head.appendChild(th);
+async function apiCall(action, payload) {
+  document.getElementById('loadingModal').style.display = 'flex';
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action, payload })
   });
-
-  const body = g.createTBody();
-  SLOTS.forEach(([a, b], slot) => {
-    const tr = body.insertRow();
-    if (slot === LUNCH_INDEX) tr.className = 'lunch';
-    const th = document.createElement('th');
-    th.scope = 'row';
-    th.append(a);
-    const sm = document.createElement('small');
-    sm.textContent = slot === LUNCH_INDEX ? `${b} 午休` : b;
-    th.appendChild(sm);
-    tr.appendChild(th);
-
-    for (let day = 1; day <= 5; day++) {
-      const cell = map[`${day}-${slot}`];
-      const past = slotStart(day, slot) <= now();
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = (cell ? cell.type : 'free') + (past ? ' past' : '');
-      if (cell) btn.textContent = cell.label;
-      btn.setAttribute('aria-label', `週${DAYS[day - 1]} ${a}-${b} ${cell ? cell.label : '可預約'}${past ? ' 已過期' : ''}`);
-      btn.onclick = () => onCell(day, slot, cell, past);
-      tr.insertCell().appendChild(btn);
-    }
-  });
+  const data = await res.json();
+  document.getElementById('loadingModal').style.display = 'none';
+  if (!data.success) throw new Error(data.error);
+  return data.data;
 }
 
-/* ========= 點擊格子 ========= */
-async function onCell(day, slot, cell, past) {
-  const D = S.data;
-  const when = `週${DAYS[day - 1]} ${SLOTS[slot][0]}–${SLOTS[slot][1]}`;
-
-  if (S.adminMode) {
-    if (cell && cell.type === 'fixed') {
-      if (await ask('取消固定時段', `${when}「${cell.label}」要恢復為可預約嗎？`)) act('admin_setFixed', { day, slot, clear: true });
+async function fetchInitData(userId) {
+  try {
+    systemData = await apiCall('getInitData', { userId });
+    currentUser = { userId: userId };
+    
+    if (!systemData.isRegistered) {
+      document.getElementById('registerModal').style.display = 'flex';
     } else {
-      const label = $('#fixedLabel').value.trim() || '樂器班';
-      const warn = cell ? `（目前已有 ${cell.label} 的預約，將被取消）` : '';
-      if (await ask('設為固定時段', `${when} 設為「${label}」${warn}`)) act('admin_setFixed', { day, slot, label });
+      currentUser = systemData.userData;
+      setupDashboard();
     }
-    return;
-  }
-
-  if (!D.registered) return openRegister();
-  if (past) return toast('這個時段已過期');
-  if (cell && cell.type === 'fixed') return toast(`固定時段：${cell.label}`);
-  if (cell && cell.type === 'booked') return toast(`已被 ${cell.label} 預約`);
-
-  if (cell && cell.type === 'mine') {
-    if (await ask('取消預約', `確定取消 ${when} 的預約嗎？`, '取消預約')) {
-      if (await act('cancel', { day, slot })) toast('已取消預約');
-    }
-    return;
-  }
-
-  const mine = D.bookings.filter((b) => b.mine).length;
-  if (mine >= D.limit) return toast(`每週最多預約 ${D.limit} 個時段`);
-  if (await ask('預約時段', `確定預約 ${when} 嗎？`, '預約')) {
-    if (await act('book', { day, slot })) toast('預約成功');
+  } catch (err) {
+    alert("載入資料失敗：" + err.message);
   }
 }
 
-/* ========= 註冊 ========= */
-function openRegister() {
-  const d = $('#dlgReg');
-  if (!d.open) d.showModal();
+async function register() {
+  const name = document.getElementById('regName').value.trim();
+  const nickname = document.getElementById('regNick').value.trim();
+  if (!name || !nickname) return alert("請填寫完整資訊");
+
+  try {
+    await apiCall('register', { userId: currentUser.userId, name, nickname });
+    document.getElementById('registerModal').style.display = 'none';
+    fetchInitData(currentUser.userId); // 重新載入
+  } catch (err) {
+    alert("註冊失敗");
+  }
 }
-$('#dlgReg').addEventListener('cancel', (e) => e.preventDefault()); // 不可用 Esc 關閉
-$('#regForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const btn = $('#regOk');
-  btn.disabled = true;
-  const ok = await act('register', { name: $('#regName').value.trim(), studentId: $('#regSid').value.trim() });
-  btn.disabled = false;
-  if (ok) { $('#dlgReg').close(); toast('註冊成功'); }
-});
 
-/* ========= 密碼顯示 ========= */
-$('#pwBtn').onclick = () => {
-  const el = $('#pwVal');
-  const hidden = el.classList.toggle('hide');
-  $('#pwBtn').textContent = hidden ? '顯示' : '隱藏';
-};
+function setupDashboard() {
+  document.getElementById('userInfoCard').style.display = 'block';
+  document.getElementById('scheduleCard').style.display = 'block';
+  
+  document.getElementById('userName').innerText = currentUser.nickname;
+  document.getElementById('roomPwd').innerText = systemData.password;
+  
+  if (currentUser.isAdmin) {
+    document.getElementById('adminBtn').classList.remove('hidden');
+  }
 
-/* ========= 管理後台 ========= */
-function renderAnn() {
-  const box = $('#annList');
-  box.replaceChildren();
-  if (!S.data.announcements.length) box.textContent = '目前沒有公告';
-  S.data.announcements.forEach((a) => {
-    const row = document.createElement('div');
-    row.className = 'ann';
-    const t = document.createElement('span');
-    t.textContent = a.text;
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.textContent = '刪除';
-    del.onclick = async () => {
-      if (await ask('刪除公告', a.text, '刪除')) { await act('admin_deleteAnnouncement', { id: a.id }); openAdmin(); }
-    };
-    row.append(t, del);
-    box.appendChild(row);
+  // 設定跑馬燈與彈窗公告
+  if (systemData.announcements.length > 0) {
+    const annText = systemData.announcements.join(" ｜ ");
+    document.getElementById('marqueeText').innerText = annText;
+    document.getElementById('marqueeDiv').classList.remove('hidden');
+    
+    // 隨機彈出公告
+    const randomAnn = systemData.announcements[Math.floor(Math.random() * systemData.announcements.length)];
+    document.getElementById('popupText').innerText = randomAnn;
+    document.getElementById('popupModal').style.display = 'flex';
+  }
+
+  renderTimetable();
+}
+
+function closePopup() {
+  document.getElementById('popupModal').style.display = 'none';
+}
+
+function renderTimetable() {
+  const container = document.getElementById('timetable');
+  container.innerHTML = '';
+  
+  const days = ['時間', '一', '二', '三', '四', '五'];
+  days.forEach(d => {
+    const div = document.createElement('div');
+    div.className = 'cell header-cell';
+    div.innerText = d;
+    container.appendChild(div);
+  });
+
+  const now = new Date();
+  const currentDay = now.getDay(); // 1=Mon, 5=Fri
+  const currentHourText = now.getHours() + ":" + String(now.getMinutes()).padStart(2, '0');
+
+  timeSlots.forEach(slot => {
+    // 時間欄
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'cell time-cell';
+    timeDiv.innerText = slot.replace("-", "\n|");
+    container.appendChild(timeDiv);
+
+    // 星期一到五
+    for (let day = 1; day <= 5; day++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      
+      const slotEndHour = slot.split('-')[1]; // ex: "09:00"
+      const isExpired = (day < currentDay && currentDay >=1 && currentDay <=5) || (day === currentDay && currentHourText > slotEndHour);
+
+      // 尋找此格子的預約狀態
+      const booking = systemData.schedule.find(s => s.day == day && s.timeSlot == slot);
+
+      if (isExpired) {
+        cell.classList.add('expired');
+        cell.innerText = booking ? (booking.type==='fixed' ? booking.label : booking.nickname) : '';
+      } else if (booking) {
+        if (booking.type === 'fixed') {
+          cell.classList.add('fixed');
+          cell.innerText = booking.label;
+        } else if (booking.userId === currentUser.userId) {
+          cell.classList.add('booked', 'mine');
+          cell.innerText = '取消預約';
+          cell.onclick = () => handleCancel(day, slot);
+        } else {
+          cell.classList.add('booked');
+          cell.innerText = booking.nickname;
+        }
+      } else {
+        cell.classList.add('available');
+        cell.innerText = '可預約';
+        cell.onclick = () => handleBook(day, slot);
+      }
+      container.appendChild(cell);
+    }
   });
 }
-function openAdmin() {
-  renderAnn();
-  $('#newPw').value = '';
-  if (!$('#dlgAdmin').open) $('#dlgAdmin').showModal();
-}
-$('#adminBtn').onclick = openAdmin;
-$('#adminClose').onclick = () => $('#dlgAdmin').close();
-$('#fixedMode').onclick = () => { S.adminMode = true; $('#dlgAdmin').close(); render(); };
-$('#adminDone').onclick = () => { S.adminMode = false; render(); };
-$('#annAdd').onclick = async () => {
-  const text = $('#annText').value.trim();
-  if (!text) return toast('請輸入公告內容');
-  if (await act('admin_addAnnouncement', { text })) { $('#annText').value = ''; renderAnn(); }
-};
-$('#pwSave').onclick = async () => {
-  const password = $('#newPw').value.trim();
-  if (!password) return toast('請輸入新密碼');
-  if (await act('admin_setPassword', { password })) { $('#newPw').value = ''; toast('社辦密碼已更新'); }
-};
 
-/* ========= 啟動 ========= */
-(async function boot() {
+async function handleBook(day, timeSlot) {
+  if(!confirm(`確定要預約 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 嗎？`)) return;
   try {
-    await liff.init({ liffId: CONFIG.LIFF_ID });
-    if (!liff.isLoggedIn()) { liff.login(); return; }
-    await load();
-    if (S.data && !S.data.registered) openRegister();
-    setInterval(() => S.data && render(), 60000); // 每分鐘更新「已過期」狀態
-  } catch (e) {
-    console.error(e);
-    $('#loading').textContent = '載入失敗，請重新開啟頁面';
-    return;
+    await apiCall('book', { userId: currentUser.userId, nickname: currentUser.nickname, day, timeSlot });
+    alert("預約成功！");
+    fetchInitData(currentUser.userId);
+  } catch (err) {
+    alert(err.message);
   }
-  $('#loading').remove();
-})();
+}
+
+async function handleCancel(day, timeSlot) {
+  if(!confirm(`確定要取消 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 的預約嗎？`)) return;
+  try {
+    await apiCall('cancel', { userId: currentUser.userId, day, timeSlot });
+    alert("取消成功！");
+    fetchInitData(currentUser.userId);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function openAdmin() {
+  const newPwd = prompt("輸入新的社辦密碼 (取消則不修改):");
+  if(newPwd) {
+    apiCall('adminUpdate', { userId: currentUser.userId, type: 'password', data: { newPassword: newPwd }})
+      .then(() => { alert("密碼更新成功！"); fetchInitData(currentUser.userId); });
+  }
+}
