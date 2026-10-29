@@ -1,170 +1,95 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>社辦時段預約｜國北詞曲創作社</title>
-<style>
-:root{
-  --ink:#17202e; --bg:#e9edf3; --card:#fff; --line:#cfd6e2;
-  --free:#fff; --booked:#d7e0f1; --mine:#1f6f5c; --fixed:#5b3a82;
-  --past:#dcdfe5; --pastInk:#8a909b; --amber:#e8a317; --danger:#b3261e;
-  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
-}
-*{box-sizing:border-box;margin:0}
-body{background:var(--bg);color:var(--ink);font-size:15px;padding-bottom:calc(72px + env(safe-area-inset-bottom))}
-button{font:inherit;color:inherit;cursor:pointer}
-:focus-visible{outline:3px solid var(--amber);outline-offset:1px}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>社辦時段預約系統</title>
+  <style>
+    :root { --primary: #4A90E2; --bg: #f4f7f6; --text: #333; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+    
+    /* Marquee */
+    .marquee-container { background: #ffeb3b; padding: 5px; overflow: hidden; white-space: nowrap; font-weight: bold; }
+    .marquee-content { display: inline-block; animation: marquee 15s linear infinite; }
+    @keyframes marquee { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
 
-/* 標題：五線譜底紋 */
-.top{padding:calc(14px + env(safe-area-inset-top)) 16px 14px;color:#fff;background:
-  repeating-linear-gradient(to bottom,transparent 0 9px,rgba(255,255,255,.14) 9px 10px) 0 12px/100% 41px no-repeat,var(--ink);
-  display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
-.top h1{font-size:20px;letter-spacing:.04em}
-.top small{display:block;font-size:12px;opacity:.7;margin-top:2px}
-#who{font-size:13px;text-align:right;white-space:nowrap}
+    /* Layout */
+    .container { max-width: 800px; margin: 20px auto; padding: 10px; }
+    .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    
+    /* Timetable Grid */
+    .timetable { display: grid; grid-template-columns: 80px repeat(5, 1fr); gap: 5px; text-align: center; font-size: 12px; }
+    .cell { padding: 10px 5px; border-radius: 5px; background: #e0e0e0; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; min-height: 40px;}
+    .header-cell { background: #333; color: white; font-weight: bold; }
+    .time-cell { background: #ddd; font-weight: bold; cursor: default; }
+    
+    /* Status Colors */
+    .available { background: #e8f5e9; border: 1px solid #4caf50; }
+    .available:hover { background: #c8e6c9; }
+    .booked { background: #ffe0b2; color: #e65100; cursor: default; }
+    .booked.mine { background: #bbdefb; color: #0d47a1; cursor: pointer; border: 1px dashed #0d47a1;}
+    .fixed { background: #f48fb1; color: white; cursor: default; }
+    .expired { background: #bdbdbd; color: #757575; cursor: not-allowed; }
 
-/* 跑馬燈 */
-.marquee{display:flex;align-items:center;background:#fff6dc;border-bottom:1px solid #f0dca4;overflow:hidden}
-.marquee .tag{flex:none;background:var(--amber);color:#2a1d00;font-weight:700;font-size:12px;padding:8px 10px}
-.track{flex:1;overflow:hidden;white-space:nowrap}
-.track div{display:inline-block;padding-left:100%;font-size:14px;animation:slide var(--dur,30s) linear infinite}
-@keyframes slide{to{transform:translateX(-100%)}}
-@media (prefers-reduced-motion:reduce){.track{overflow-x:auto}.track div{animation:none;padding-left:10px}}
-
-/* 密碼 */
-.pw{margin:12px 12px 0;background:var(--card);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line)}
-.pw b{font-size:20px;letter-spacing:.2em;font-variant-numeric:tabular-nums}
-.pw b.hide{filter:blur(7px);user-select:none}
-.pw button{border:1px solid var(--line);background:#f5f7fa;border-radius:8px;padding:6px 12px}
-
-.adminbar{position:sticky;top:0;z-index:5;background:var(--fixed);color:#fff;padding:10px 12px;display:flex;gap:8px;align-items:center;font-size:14px}
-.adminbar input{flex:1;min-width:0;border:0;border-radius:6px;padding:7px 8px;font:inherit}
-.adminbar button{border:0;border-radius:6px;background:#fff;color:var(--fixed);padding:7px 12px;font-weight:700}
-
-main{padding:12px}
-.meta{display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px}
-.meta strong{font-variant-numeric:tabular-nums}
-.grid-wrap{background:var(--card);border-radius:12px;border:1px solid var(--line);overflow-x:auto}
-table{width:100%;min-width:340px;border-collapse:collapse;table-layout:fixed}
-th,td{border:1px solid var(--line);padding:0;text-align:center}
-thead th{background:#f3f5f9;font-size:13px;padding:6px 0;line-height:1.25}
-thead th small{display:block;font-weight:400;color:#5d6676;font-size:11px}
-thead th:first-child,tbody th{width:54px}
-tbody th{background:#f3f5f9;font-weight:500;font-size:12px;line-height:1.2;padding:4px 0}
-tbody th small{display:block;color:#6a7384;font-size:10px}
-tbody tr.lunch th,tbody tr.lunch td{border-bottom:2px solid var(--ink)}
-td button{display:flex;align-items:center;justify-content:center;width:100%;height:46px;border:0;background:var(--free);font-size:12px;line-height:1.15;padding:2px;overflow:hidden;word-break:break-all}
-td button.free::after{content:"+";color:#b4bccb;font-size:18px}
-td button.booked{background:var(--booked)}
-td button.mine{background:var(--mine);color:#fff;font-weight:700}
-td button.fixed{background:var(--fixed);color:#fff}
-td button.past{background:var(--past);color:var(--pastInk);cursor:not-allowed}
-td button.past.fixed,td button.past.mine{opacity:.6}
-.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:#4a5363}
-.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px;border:1px solid var(--line)}
-
-#adminBtn{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));background:var(--ink);color:#fff;border:0;border-radius:24px;padding:11px 18px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
-
-/* Dialog */
-dialog{border:0;border-radius:14px;padding:20px;width:min(92vw,400px);color:var(--ink);margin:auto}
-dialog::backdrop{background:rgba(15,20,30,.55)}
-dialog h2{font-size:18px;margin-bottom:6px}
-dialog p{color:#4a5363;margin-bottom:12px;line-height:1.5}
-label{display:block;font-size:13px;margin:10px 0 4px}
-input[type=text],input[type=password]{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit}
-.row{display:flex;gap:8px;margin-top:16px}
-.row button,.btn{flex:1;border:1px solid var(--line);background:#f5f7fa;border-radius:8px;padding:10px;font-weight:600}
-.row .primary,.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
-.btn.danger{color:var(--danger)}
-.sec{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
-.sec h3{font-size:15px;margin-bottom:8px}
-.ann{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:14px}
-.ann span{flex:1;word-break:break-all}
-.ann button{flex:none;border:0;background:none;color:var(--danger);padding:6px}
-.inline{display:flex;gap:8px}.inline .btn{flex:none;padding:10px 14px}
-
-#toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;max-width:88vw;text-align:center;z-index:99}
-#toast.on{opacity:1;transform:translate(-50%,0)}
-#loading{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:50}
-</style>
+    /* Modals */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000;}
+    .modal { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; }
+    .modal.active { display: block; }
+    input, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;}
+    button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold;}
+    button.danger { background: #f44336; }
+    
+    .hidden { display: none !important; }
+  </style>
 </head>
 <body>
-<div id="loading">載入中…</div>
 
-<header class="top">
-  <div><h1>社辦時段預約<small>國北詞曲創作社</small></h1></div>
-  <div id="who"></div>
-</header>
-
-<div class="marquee" id="mq" hidden><span class="tag">公告</span><div class="track"><div id="mqText"></div></div></div>
-
-<section class="pw" id="pw" hidden>
-  <span>社辦密碼 <b id="pwVal" class="hide">••••</b></span>
-  <button id="pwBtn" type="button">顯示</button>
-</section>
-
-<div class="adminbar" id="adminBar" hidden>
-  <span>固定時段編輯：點格子設定或取消</span>
-  <input id="fixedLabel" type="text" value="樂器班" maxlength="10" aria-label="固定時段標籤">
-  <button id="adminDone" type="button">完成</button>
-</div>
-
-<main>
-  <div class="meta"><span id="weekLabel"></span><strong id="quota"></strong></div>
-  <div class="grid-wrap"><table id="grid"></table></div>
-  <div class="legend">
-    <span><i style="background:#fff"></i>可預約</span>
-    <span><i style="background:var(--booked)"></i>已預約</span>
-    <span><i style="background:var(--mine)"></i>我的預約</span>
-    <span><i style="background:var(--fixed)"></i>固定／樂器班</span>
-    <span><i style="background:var(--past)"></i>已過期</span>
+  <!-- Marquee -->
+  <div class="marquee-container" id="marqueeDiv" class="hidden">
+    <div class="marquee-content" id="marqueeText">載入公告中...</div>
   </div>
-</main>
 
-<button id="adminBtn" type="button" hidden>管理後台</button>
+  <div class="container">
+    <div class="card" id="userInfoCard" style="display:none;">
+      <h3>👋 歡迎, <span id="userName"></span></h3>
+      <p>目前社辦密碼：<strong style="color:red; font-size:1.2em;" id="roomPwd"></strong></p>
+      <button id="adminBtn" class="hidden" style="background:#333;" onclick="openAdmin()">⚙️ 管理員後台</button>
+    </div>
 
-<!-- 註冊 -->
-<dialog id="dlgReg">
-  <form id="regForm">
-    <h2>首次使用，請先註冊</h2>
-    <p>註冊後才能預約時段與查看社辦密碼。</p>
-    <label for="regName">姓名</label>
-    <input id="regName" type="text" required maxlength="20" autocomplete="name">
-    <label for="regSid">學號／社員編號</label>
-    <input id="regSid" type="text" required maxlength="20" pattern="[A-Za-z0-9\-]{3,20}" autocomplete="off">
-    <div class="row"><button class="primary" type="submit" id="regOk">完成註冊</button></div>
-  </form>
-</dialog>
-
-<!-- 確認 -->
-<dialog id="dlgConfirm">
-  <form method="dialog">
-    <h2 id="cfTitle"></h2><p id="cfBody"></p>
-    <div class="row"><button value="cancel">返回</button><button class="primary" value="ok" id="cfOk">確定</button></div>
-  </form>
-</dialog>
-
-<!-- 管理後台 -->
-<dialog id="dlgAdmin">
-  <h2>管理後台</h2>
-  <div class="sec"><h3>固定時段（樂器班）</h3>
-    <p>進入編輯模式後，直接點課表格子即可設為固定佔用；再點一次取消。每週重置不會清除。</p>
-    <button class="btn primary" id="fixedMode" type="button" style="width:100%">進入固定時段編輯</button>
+    <div class="card" id="scheduleCard" style="display:none;">
+      <h4>每週最多預約 3 個時段 (點擊綠色格子預約，點擊藍色格子取消)</h4>
+      <div class="timetable" id="timetable">
+        <!-- 網格由 JS 生成 -->
+      </div>
+    </div>
   </div>
-  <div class="sec"><h3>跑馬燈公告</h3>
-    <div id="annList"></div>
-    <div class="inline"><input id="annText" type="text" maxlength="200" placeholder="新增公告內容" aria-label="新增公告"><button class="btn" id="annAdd" type="button">新增</button></div>
-  </div>
-  <div class="sec"><h3>社辦密碼</h3>
-    <div class="inline"><input id="newPw" type="text" maxlength="50" placeholder="輸入新密碼" aria-label="新密碼"><button class="btn" id="pwSave" type="button">更新</button></div>
-  </div>
-  <div class="row"><button class="btn" id="adminClose" type="button">關閉</button></div>
-</dialog>
 
-<div id="toast" role="status" aria-live="polite"></div>
+  <!-- Register Modal -->
+  <div class="modal-overlay" id="registerModal">
+    <div class="modal active">
+      <h3>註冊社員資料</h3>
+      <input type="text" id="regName" placeholder="真實姓名 (必填)">
+      <input type="text" id="regNick" placeholder="暱稱 (必填，顯示於預約表)">
+      <button onclick="register()">送出註冊</button>
+    </div>
+  </div>
 
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="app.js"></script>
+  <!-- Popup Announcement Modal -->
+  <div class="modal-overlay" id="popupModal">
+    <div class="modal active">
+      <h3>📣 最新公告</h3>
+      <p id="popupText"></p>
+      <button onclick="closePopup()">我知道了</button>
+    </div>
+  </div>
+
+  <!-- Loading Modal -->
+  <div class="modal-overlay" id="loadingModal" style="display:flex;">
+    <h2 style="color:white;">系統載入中...</h2>
+  </div>
+
+  <!-- LIFF SDK & App Logic -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
