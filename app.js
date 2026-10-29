@@ -1,7 +1,7 @@
 /* ========= 設定（部署前請修改） ========= */
 const CONFIG = {
-  LIFF_ID: 'YOUR_LIFF_ID',
-  API_URL: 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec',
+  LIFF_ID: '2011084676-suwQE7jT',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwrCtCJtuoilN3DghNHVrvJz-ax4ehlsJQ1Xu0RyAdCFArhMB2BzpTHgkRFn1vey7RS/exec',
 };
 
 const SLOTS = [
