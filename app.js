@@ -1,6 +1,6 @@
 // app.js
 const LIFF_ID = "2011084676-suwQE7jT"; 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzdFBExPsp296HKlcZEK4NZ_qCIfBDbV5REPEYqMyJ4h93vZznQv-yki4XVMMo6Dj-7XQ/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxfrgN9k6FJbBCixKQ3-J9ZhgVu8s1q4cjxjHklqf6NcrCgyH1rI-NvOheW0JpSworrsw/exec";
 
 const timeSlots = [
   "08:00-09:00", "09:00-10:00", "10:00-11:00", "11:00-12:00",
