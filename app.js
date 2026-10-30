@@ -197,3 +197,7 @@ function openAdmin() {
       .then(() => { alert("密碼更新成功！"); fetchInitData(currentUser.userId); });
   }
 }
+
+function openAdmin() {
+  document.getElementById('adminModal').style.display = 'flex';
+}
