@@ -190,6 +190,10 @@ async function handleCancel(day, timeSlot) {
   }
 }
 
+function openAdmin() {
+  document.getElementById('adminModal').style.display = 'flex';
+}
+
 async function updateAnnouncement() {
   const text = document.getElementById('announcementText').value;
   if (!text) return alert('請輸入公告');
