@@ -83,6 +83,24 @@
     </div>
   </div>
 
+    <!-- Admin Modal (管理員後台) -->
+  <div class="modal-overlay" id="adminModal" style="display: none; z-index: 2000;">
+    <div class="modal active">
+      <h3>⚙️ 管理員後台</h3>
+      <input type="text" id="announcementText" placeholder="輸入跑馬燈與彈出公告">
+      <button onclick="updateAnnouncement()">發布公告</button>
+      
+      <hr style="margin:15px 0; border:0.5px solid #eee;">
+      
+      <input type="number" id="fixedDay" placeholder="星期幾 (輸入 1-5)" min="1" max="5">
+      <input type="text" id="fixedTime" placeholder="時段 (例: 18:00)">
+      <input type="text" id="fixedLabel" placeholder="顯示文字 (例: 樂器班)">
+      <button onclick="addFixedBooking()">設定固定時段</button>
+      
+      <button class="danger" onclick="document.getElementById('adminModal').style.display='none'">關閉後台</button>
+    </div>
+  </div>
+
   <!-- Loading Modal -->
   <div class="modal-overlay" id="loadingModal" style="display:flex;">
     <h2 style="color:white;">系統載入中...</h2>
