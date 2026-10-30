@@ -13,17 +13,29 @@ let systemData = null;
 
 window.onload = async () => {
   try {
+    // 檢查是否有填寫 LIFF ID
+    if (LIFF_ID === "YOUR_LIFF_ID_HERE" || !LIFF_ID) {
+      alert("錯誤：請先在 app.js 中填寫真實的 LIFF_ID！");
+      return;
+    }
+
     await liff.init({ liffId: LIFF_ID });
+    
     if (!liff.isLoggedIn()) {
       liff.login();
       return;
     }
+    
     const profile = await liff.getProfile();
     fetchInitData(profile.userId);
+    
   } catch (err) {
-    alert("LIFF 初始化失敗");
+    console.error("LIFF 錯誤詳情:", err);
+    // 這裡會把真正的錯誤原因印出來！
+    alert("初始化失敗！\n代碼：" + err.code + "\n訊息：" + err.message);
   }
 };
+
 
 async function apiCall(action, payload) {
   document.getElementById('loadingModal').style.display = 'flex';
