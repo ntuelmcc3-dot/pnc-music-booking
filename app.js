@@ -190,14 +190,36 @@ async function handleCancel(day, timeSlot) {
   }
 }
 
-function openAdmin() {
-  const newPwd = prompt("輸入新的社辦密碼 (取消則不修改):");
-  if(newPwd) {
-    apiCall('adminUpdate', { userId: currentUser.userId, type: 'password', data: { newPassword: newPwd }})
-      .then(() => { alert("密碼更新成功！"); fetchInitData(currentUser.userId); });
+async function updateAnnouncement() {
+  const text = document.getElementById('announcementText').value;
+  if (!text) return alert('請輸入公告');
+  await sendAdminData({ action: 'updateAnnouncement', text });
+}
+
+async function addFixedBooking() {
+  const day = document.getElementById('fixedDay').value;
+  const time = document.getElementById('fixedTime').value;
+  const label = document.getElementById('fixedLabel').value;
+  if (!day || !time || !label) return alert('請填寫完整');
+  await sendAdminData({ action: 'addFixedBooking', day, time, label });
+}
+
+async function updatePassword() {
+  const pwd = document.getElementById('newPassword').value;
+  if (!pwd) return alert('請輸入新密碼');
+  await sendAdminData({ action: 'updatePassword', password: pwd });
+}
+
+async function sendAdminData(data) {
+  document.getElementById('loadingModal').style.display = 'flex';
+  data.userId = liff.getContext().userId; // 帶入身分供後端驗證
+  try {
+    await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(data) });
+    alert('設定成功！請重新整理網頁。');
+    location.reload();
+  } catch (err) {
+    alert('設定失敗，請檢查網路連線');
+    document.getElementById('loadingModal').style.display = 'none';
   }
 }
 
-function openAdmin() {
-  document.getElementById('adminModal').style.display = 'flex';
-}
