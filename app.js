@@ -179,11 +179,22 @@ async function handleBook(day, timeSlot) {
   }
 }
 
-async function handleCancel(day, timeSlot) {
-  if(!confirm(`確定要取消 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 的預約嗎？`)) return;
+async function handleBook(day, timeSlot) {
+  // 1. 時間鎖防呆：限制星期六全天，以及星期日晚上 20:00 前禁止預約
+  const now = new Date();
+  const currentDay = now.getDay(); 
+  const currentHour = now.getHours();
+
+  if (currentDay === 6 || (currentDay === 0 && currentHour < 23)) {
+    alert('下週預約尚未開放！將於週日晚上 23:00 正式開放搶位。');
+    return; // 直接中斷，不往下執行
+  }
+
+  // 2. 原本的預約與 API 呼叫邏輯
+  if(!confirm(`確定要預約 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 嗎？`)) return;
   try {
-    await apiCall('cancel', { userId: currentUser.userId, day, timeSlot });
-    alert("取消成功！");
+    await apiCall('book', { userId: currentUser.userId, nickname: currentUser.nickname, day, timeSlot });
+    alert("預約成功！");
     fetchInitData(currentUser.userId);
   } catch (err) {
     alert(err.message);
