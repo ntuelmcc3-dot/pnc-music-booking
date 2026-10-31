@@ -180,7 +180,7 @@ async function handleBook(day, timeSlot) {
 }
 
 async function handleBook(day, timeSlot) {
-  // 1. 時間鎖防呆：限制星期六全天，以及星期日晚上 20:00 前禁止預約
+  // 1. 時間鎖防呆：限制星期六全天，以及星期日晚上 23:00 前禁止預約
   const now = new Date();
   const currentDay = now.getDay(); 
   const currentHour = now.getHours();
