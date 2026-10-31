@@ -122,9 +122,13 @@ function renderTimetable() {
   });
 
   const now = new Date();
-  const currentDay = now.getDay(); // 1=Mon, 5=Fri
-  const currentHourText = now.getHours() + ":" + String(now.getMinutes()).padStart(2, '0');
-
+  const currentDay = now.getDay(); 
+  const currentHour = now.getHours();
+  const currentHourText = currentHour + ":" + String(now.getMinutes()).padStart(2, '0');
+  
+  // ✨ 加上這行判斷：星期六全天，或星期日 23:00 以前，都算「未開放」
+  const isBookingOpen = !(currentDay === 6 || (currentDay === 0 && currentHour < 23));
+  
   timeSlots.forEach(slot => {
     // 時間欄
     const timeDiv = document.createElement('div');
@@ -140,7 +144,7 @@ function renderTimetable() {
       const slotEndHour = slot.split('-')[1]; // ex: "09:00"
       const isExpired = (day < currentDay && currentDay >=1 && currentDay <=5) || (day === currentDay && currentHourText > slotEndHour);
 
-      // 尋找此格子的預約狀態
+    // 尋找此格子的預約狀態
       const booking = systemData.schedule.find(s => s.day == day && s.timeSlot == slot);
 
       if (isExpired) {
@@ -158,6 +162,11 @@ function renderTimetable() {
           cell.classList.add('booked');
           cell.innerText = booking.nickname;
         }
+      } else if (!isBookingOpen) {
+        // ✨ 新增：如果尚未開放預約，顯示灰色且不可點擊
+        cell.classList.add('expired'); // 直接借用過期的灰色樣式
+        cell.innerText = '未開放';
+        // 注意：這裡不綁定 onclick，所以點擊無效
       } else {
         cell.classList.add('available');
         cell.innerText = '可預約';
