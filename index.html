@@ -92,18 +92,51 @@
       
       <hr style="margin:15px 0; border:0.5px solid #eee;">
       
+      <h4>📌 新增固定行程</h4>
       <input type="number" id="fixedDay" placeholder="星期幾 (輸入 1-5)" min="1" max="5">
-      <input type="text" id="fixedTime" placeholder="時段 (例: 18:00)">
+      <input type="text" id="fixedTime" placeholder="時段 (例: 18:00-19:00冒號半形)">
       <input type="text" id="fixedLabel" placeholder="顯示文字 (例: 樂器班)">
       <button onclick="addFixedBooking()">設定固定時段</button>
-            <hr style="margin:15px 0; border:0.5px solid #eee;">
+
+      <hr style="margin:15px 0; border:0.5px solid #eee;">
+
+      <!-- ✨ 新增：撤銷固定行程區塊 -->
+      <h4>🗑️ 撤銷固定行程</h4>
+      <select id="deleteFixedDay" style="width: 100%; padding: 8px; margin-bottom: 8px;">
+        <option value="1">星期一</option>
+        <option value="2">星期二</option>
+        <option value="3">星期三</option>
+        <option value="4">星期四</option>
+        <option value="5">星期五</option>
+      </select>
+
+      <select id="deleteFixedTime" style="width: 100%; padding: 8px; margin-bottom: 8px;">
+        <option value="08:00-09:00">08:00-09:00</option>
+        <option value="09:00-10:00">09:00-10:00</option>
+        <option value="10:00-11:00">10:00-11:00</option>
+        <option value="11:00-12:00">11:00-12:00</option>
+        <option value="12:00-13:30">12:00-13:30</option>
+        <option value="13:30-14:30">13:30-14:30</option>
+        <option value="14:30-15:30">14:30-15:30</option>
+        <option value="15:30-16:30">15:30-16:30</option>
+        <option value="16:30-17:30">16:30-17:30</option>
+        <option value="18:00-19:00">18:00-19:00</option>
+        <option value="19:00-20:00">19:00-20:00</option>
+        <option value="20:00-21:00">20:00-21:00</option>
+        <option value="21:00-22:00">21:00-22:00</option>
+      </select>
+      <button class="danger" onclick="deleteFixedBooking()">確認撤銷固定行程</button>
+
+      <hr style="margin:15px 0; border:0.5px solid #eee;">
+      
       <input type="text" id="newPassword" placeholder="輸入新密碼 (例: 5678)">
       <button onclick="updatePassword()">更新社辦密碼</button>
       <br><br>
 
-      <button class="danger" onclick="document.getElementById('adminModal').style.display='none'">關閉後台</button>
+      <button onclick="document.getElementById('adminModal').style.display='none'">關閉後台</button>
     </div>
   </div>
+
 
   <!-- Loading Modal -->
   <div class="modal-overlay" id="loadingModal" style="display:flex;">
