@@ -237,16 +237,17 @@ async function sendAdminData(data) {
 }
 
 async function deleteFixedBooking() {
-  const day = document.getElementById('deleteFixedDay').value;
+  const day = parseInt(document.getElementById('deleteFixedDay').value, 10);
   const timeSlot = document.getElementById('deleteFixedTime').value;
 
   if (!confirm(`確定要撤銷 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 的固定行程嗎？`)) return;
 
   try {
-    await sendAdminData({
-      action: 'adminUpdate',
+    // 改用 apiCall，自動幫你帶 payload 層
+    await apiCall('adminUpdate', {
+      userId: currentUser.userId,
       type: 'deleteFixedBooking',
-      data: { day, timeSlot }
+      data: { day: day, timeSlot: timeSlot }
     });
     alert('撤銷成功！');
     location.reload();
@@ -254,3 +255,4 @@ async function deleteFixedBooking() {
     alert('撤銷失敗：' + err.message);
   }
 }
+
