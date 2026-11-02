@@ -178,17 +178,6 @@ function renderTimetable() {
 }
 
 async function handleBook(day, timeSlot) {
-  if(!confirm(`確定要預約 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 嗎？`)) return;
-  try {
-    await apiCall('book', { userId: currentUser.userId, nickname: currentUser.nickname, day, timeSlot });
-    alert("預約成功！");
-    fetchInitData(currentUser.userId);
-  } catch (err) {
-    alert(err.message);
-  }
-}
-
-async function handleBook(day, timeSlot) {
   // 1. 時間鎖防呆：限制星期六全天，以及星期日晚上 23:00 前禁止預約
   const now = new Date();
   const currentDay = now.getDay(); 
