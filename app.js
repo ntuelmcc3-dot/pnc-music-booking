@@ -247,3 +247,21 @@ async function sendAdminData(data) {
   }
 }
 
+async function deleteFixedBooking() {
+  const day = document.getElementById('deleteFixedDay').value;
+  const timeSlot = document.getElementById('deleteFixedTime').value;
+
+  if (!confirm(`確定要撤銷 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 的固定行程嗎？`)) return;
+
+  try {
+    await sendAdminData({
+      action: 'adminUpdate',
+      type: 'deleteFixedBooking',
+      data: { day, timeSlot }
+    });
+    alert('撤銷成功！');
+    location.reload();
+  } catch (err) {
+    alert('撤銷失敗：' + err.message);
+  }
+}
