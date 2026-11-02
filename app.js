@@ -210,12 +210,25 @@ async function updateAnnouncement() {
 }
 
 async function addFixedBooking() {
-  const day = document.getElementById('fixedDay').value;
-  const time = document.getElementById('fixedTime').value;
-  const label = document.getElementById('fixedLabel').value;
-  if (!day || !time || !label) return alert('請填寫完整');
-  await sendAdminData({ action: 'addFixedBooking', day, time, label });
+  const day = parseInt(document.getElementById('fixedDay').value, 10);
+  const timeSlot = document.getElementById('fixedTime').value;
+  const label = document.getElementById('fixedLabel').value.trim();
+
+  if (!label) return alert('請填寫行程顯示名稱！');
+
+  try {
+    await apiCall('adminUpdate', {
+      userId: currentUser.userId,
+      type: 'setFixedSlot',
+      data: { day, timeSlot, label }
+    });
+    alert('設定成功！');
+    location.reload();
+  } catch (err) {
+    alert('設定失敗：' + err.message);
+  }
 }
+
 
 async function updatePassword() {
   const pwd = document.getElementById('newPassword').value;
