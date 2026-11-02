@@ -92,10 +92,35 @@
       
       <hr style="margin:15px 0; border:0.5px solid #eee;">
       
+      <!-- 📌 新增固定行程 -->
       <h4>📌 新增固定行程</h4>
-      <input type="number" id="fixedDay" placeholder="星期幾 (輸入 1-5)" min="1" max="5">
-      <input type="text" id="fixedTime" placeholder="時段 (例: 18:00-19:00冒號半形)">
-      <input type="text" id="fixedLabel" placeholder="顯示文字 (例: 樂器班)">
+      <label style="font-size: 12px; color: #666;">選擇星期：</label>
+      <select id="fixedDay" style="width: 100%; padding: 8px; margin-bottom: 8px;">
+        <option value="1">星期一</option>
+        <option value="2">星期二</option>
+        <option value="3">星期三</option>
+        <option value="4">星期四</option>
+        <option value="5">星期五</option>
+      </select>
+
+      <label style="font-size: 12px; color: #666;">選擇時段：</label>
+      <select id="fixedTime" style="width: 100%; padding: 8px; margin-bottom: 8px;">
+        <option value="08:00-09:00">08:00-09:00</option>
+        <option value="09:00-10:00">09:00-10:00</option>
+        <option value="10:00-11:00">10:00-11:00</option>
+        <option value="11:00-12:00">11:00-12:00</option>
+        <option value="12:00-13:30">12:00-13:30</option>
+        <option value="13:30-14:30">13:30-14:30</option>
+        <option value="14:30-15:30">14:30-15:30</option>
+        <option value="15:30-16:30">15:30-16:30</option>
+        <option value="16:30-17:30">16:30-17:30</option>
+        <option value="18:00-19:00">18:00-19:00</option>
+        <option value="19:00-20:00">19:00-20:00</option>
+        <option value="20:00-21:00">20:00-21:00</option>
+        <option value="21:00-22:00">21:00-22:00</option>
+      </select>
+
+      <input type="text" id="fixedLabel" placeholder="顯示名稱 (例: 樂器班)" style="width: 100%; padding: 8px; margin-bottom: 8px;">
       <button onclick="addFixedBooking()">設定固定時段</button>
 
       <hr style="margin:15px 0; border:0.5px solid #eee;">
