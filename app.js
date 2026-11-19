@@ -124,7 +124,9 @@ function renderTimetable() {
   const now = new Date();
   const currentDay = now.getDay(); 
   const currentHour = now.getHours();
-  const currentHourText = currentHour + ":" + String(now.getMinutes()).padStart(2, '0');
+  // ✨ 修改這裡：將小時也強制補零 (例如 1 變成 '01')
+  const currentHourText = String(currentHour).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0');
+
   
   // ✨ 加上這行判斷：星期六全天，或星期日 23:00 以前，都算「未開放」
   const isBookingOpen = !(currentDay === 6 || (currentDay === 0 && currentHour < 23));
@@ -287,20 +289,4 @@ async function handleCancel(day, timeSlot) {
   }
 }
 
-async function handleCancel(day, timeSlot) {
-  if(!confirm(`確定要取消 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 的預約嗎？`)) return;
-  
-  try {
-    // 呼叫後端執行取消動作
-    await apiCall('cancel', { 
-      userId: currentUser.userId, 
-      day: day, 
-      timeSlot: timeSlot 
-    });
-    alert("取消成功！");
-    // 重新載入最新課表，格子就會變回綠色的「可預約」
-    fetchInitData(currentUser.userId);
-  } catch (err) {
-    alert("取消失敗：" + err.message);
-  }
-}
+
