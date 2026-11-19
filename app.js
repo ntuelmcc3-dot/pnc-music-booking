@@ -269,3 +269,20 @@ async function deleteFixedBooking() {
   }
 }
 
+async function handleCancel(day, timeSlot) {
+  if(!confirm(`確定要取消 星期${['一','二','三','四','五'][day-1]} ${timeSlot} 的預約嗎？`)) return;
+  
+  try {
+    // 呼叫後端執行取消動作
+    await apiCall('cancel', { 
+      userId: currentUser.userId, 
+      day: day, 
+      timeSlot: timeSlot 
+    });
+    alert("取消成功！");
+    // 重新載入最新課表，格子就會變回綠色的「可預約」
+    fetchInitData(currentUser.userId);
+  } catch (err) {
+    alert("取消失敗：" + err.message);
+  }
+}
